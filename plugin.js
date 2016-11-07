@@ -1,13 +1,7 @@
 /*
-*   Plugin developed by Netbroad, C.B.
 *
-*   LICENCE: GPL, LGPL, MPL
-*   NON-COMMERCIAL PLUGIN.
-*
-*   Website: netbroad.eu
-*   Twitter: @netbroadcb
-*   Facebook: Netbroad
-*   LinkedIn: Netbroad
+*   Plugin developed by Dimitri Conejo
+*   www.dimitriconejo.com
 *
 */
 
