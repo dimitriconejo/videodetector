@@ -6,132 +6,223 @@
 */
 
 CKEDITOR.dialog.add( 'videoDialog', function( editor ) {
+
+    var lex = editor.plugins.videodetector.lex;
+
+    //funcion para detectar el id y la plataforma (youtube, vimeo o dailymotion) de los videos
+    var detector = function(embedCode) {
+
+        var id, reproductor, url_comprobar;
+
+        if (embedCode.indexOf('youtu.be') >= 0) {
+            reproductor = 'youtube';
+            id = embedCode.substring(embedCode.lastIndexOf("/")+1, embedCode.length);
+        }
+
+        if (embedCode.indexOf("youtube") >= 0) {
+            reproductor = 'youtube';
+
+            if (embedCode.indexOf("</iframe>") >= 0) {
+                var fin = embedCode.substring(embedCode.indexOf("embed/")+6, embedCode.length);
+                id  = fin.substring(fin.indexOf('"'), 0);
+            } else {
+                if (embedCode.indexOf("&") >= 0) {
+                    id = embedCode.substring(embedCode.indexOf("?v=")+3, embedCode.indexOf("&"));
+                } else {
+                    id = embedCode.substring(embedCode.indexOf("?v=")+3, embedCode.length);
+                }
+            }
+            url_comprobar = "https://gdata.youtube.com/feeds/api/videos/" + id + "?v=2&alt=json";
+        }
+
+        if (embedCode.indexOf("vimeo") >= 0){
+            reproductor = 'vimeo';
+            if (embedCode.indexOf("</iframe>") >= 0) {
+                var fin = embedCode.substring(embedCode.lastIndexOf('vimeo.com/"')+6, embedCode.indexOf('>'));
+                id = fin.substring(fin.lastIndexOf('/')+1, fin.indexOf('"',fin.lastIndexOf('/')+1))
+            } else {
+                id = embedCode.substring(embedCode.lastIndexOf("/")+1, embedCode.length)
+            }
+            url_comprobar = 'http://vimeo.com/api/v2/video/' + id + '.json';
+        }
+
+        if (embedCode.indexOf('dai.ly') >= 0) {
+            reproductor = 'dailymotion';
+            id = embedCode.substring(embedCode.lastIndexOf("/")+1, embedCode.length);
+        }
+
+        if (embedCode.indexOf("dailymotion") >= 0) {
+            reproductor = 'dailymotion';
+            if(embedCode.indexOf("</iframe>") >= 0) {
+                var fin = embedCode.substring(embedCode.indexOf('dailymotion.com/')+16, embedCode.indexOf('></iframe>'));
+                id = fin.substring(fin.lastIndexOf('/')+1, fin.lastIndexOf('"'))
+            } else {
+                if (embedCode.indexOf('_') >= 0) {
+                    id = embedCode.substring(embedCode.lastIndexOf('/')+1, embedCode.indexOf('_'));
+                } else {
+                    id = embedCode.substring(embedCode.lastIndexOf('/')+1, embedCode.length);
+                }
+            }
+            url_comprobar = 'https://api.dailymotion.com/video/' + id;
+        }
+
+        return {
+            id: id,
+            reproductor:reproductor,
+            url_comprobar: url_comprobar,
+        };
+    };
+
+    var getVideoSrc = function (embedCode) {
+
+        var src,
+            respuesta = detector(embedCode);
+
+        switch (respuesta.reproductor) {
+            case 'youtube':
+                src = "https://www.youtube.com/embed/"+respuesta.id+"?autohide=1&controls=1&showinfo=0";
+                break;
+            case 'vimeo':
+                src = "https://player.vimeo.com/video/"+respuesta.id+"?portrait=0";
+                break;
+            case 'dailymotion':
+                src = "https://www.dailymotion.com/embed/video/"+respuesta.id;
+                break;
+        }
+
+        return src;
+    };
+
     return {
-        title: 'Insert a Youtube, Vimeo, Dailymotion URL or embed code',
+        title: lex('insert'),
         minWidth: 400,
         minHeight: 100,
         contents: [
             {
-                id: 'tab-basic',
+                id: 'vd-base-tab',
                 label: 'Basic Settings',
                 elements: [
                     {
                         type: 'text',
-                        id: 'url_video',
-                        label: 'Youtube, Vimeo, Dailymotion URL or embed code',
-                        validate: CKEDITOR.dialog.validate.notEmpty( "Empty!" )
+                        id: 'embed_code',
+                        label: lex('embed_code'),
+                        validate: CKEDITOR.dialog.validate.notEmpty(lex('embed_code_validate_error')),
+                        setup: function(iframe, block) {
+                            var src = iframe.getAttribute('src') || '';
+                            this.setValue(src);
+                            this.oldSrc = src;
+                        },
+                        commit: function(iframe, block) {
+                            var value = this.getValue(),
+                                oldSrc = this.oldSrc,
+                                src = value == oldSrc ? oldSrc : getVideoSrc(value);
+                            iframe.setAttribute('src', src);
+                        }
+                    },
+                    {
+                        type: 'hbox',
+                        widths: [ '50%', '50%' ],
+                        children: [
+                            {
+                                type: 'text',
+                                id: 'width',
+                                label: lex('width'),
+                                setup: function(iframe, block) {
+                                    var width = iframe.getAttribute('width') || '100%';
+                                    this.setValue(width);
+                                },
+                                commit: function(iframe, block) {
+                                    iframe.setAttribute('width', this.getValue());
+                                }
+                            },
+                            {
+                                type: 'text',
+                                id: 'height',
+                                label: lex('height'),
+                                setup: function(iframe, block) {
+                                    var height = iframe.getAttribute('height') || '400';
+                                    this.setValue(height);
+                                },
+                                commit: function(iframe, block) {
+                                    iframe.setAttribute('height', this.getValue());
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: 'hbox',
+                        id: 'alignment',
+                        children: [
+                            {
+                                id: 'align',
+                                type: 'radio',
+                                items: [
+                                    [ lex('alignNone'), 'none' ],
+                                    [ lex('alignLeft'), 'left' ],
+                                    [ lex('alignCenter'), 'center' ],
+                                    [ lex('alignRight'), 'right' ]
+                                ],
+                                label: lex('align'),
+                                setup: function(iframe, block) {
+                                    var align = block.getAttribute('data-align') || 'center';
+                                    this.setValue(align);
+                                },
+                                commit: function(iframe, block) {
+                                    var align = this.getValue(),
+                                        oldAlign = block.getAttribute('data-align');
+
+                                    if (oldAlign) {
+                                        block.removeClass('videodetector_' + oldAlign);
+                                    }
+
+                                    block.setAttribute('data-align', align);
+                                    block.addClass('videodetector_' + align);
+                                }
+                            }
+                        ]
                     }
                 ]
             }
         ],
 
-        onOk: function(){
-            var dialog = this;
+        onShow: function() {
+            var selection = editor.getSelection(),
+                block = selection.getStartElement(),
+                iframe;
 
-
-            //detectamos el video
-            var respuesta = detectar();
-            var url = "";
-
-            if(respuesta.reproductor == "youtube"){
-                var url = "https://www.youtube.com/embed/"+respuesta.id_video+"?autohide=1&controls=1&showinfo=0";
-            }
-            else if(respuesta.reproductor == "vimeo"){
-                var url = "https://player.vimeo.com/video/"+respuesta.id_video+"?portrait=0";
-            }
-            else if(respuesta.reproductor == "dailymotion"){
-                var url = "https://www.dailymotion.com/embed/video/"+respuesta.id_video;
+            if (block) {
+                iframe = block.findOne('>iframe');
             }
 
-            var p = new CKEDITOR.dom.element('div');
-            p.setAttribute('class', 'videodetector');
+            if (!iframe) {
+                block = editor.document.createElement('div');
+                block.setAttribute('class', 'videodetector');
 
-            var iframe = new CKEDITOR.dom.element('iframe');
-            iframe.setAttribute('src', url);
-            iframe.setAttribute('frameborder', '0');
-            p.append(iframe);
+                iframe = editor.document.createElement('iframe');
+                iframe.setAttribute('frameborder', '0');
+                block.append(iframe);
 
-            // var edit_btn = new CKEDITOR.dom.element('input');
-            // edit_btn.setAttribute('type', 'button');
-            // edit_btn.setAttribute('value', 'Edit video');
-            // edit_btn.setAttribute('class', 'edit-videodetector');
-            // p.append(edit_btn);
+                this.insertMode = true;
+            } else {
+                this.insertMode = false;
+            }
 
-            var remove_btn = new CKEDITOR.dom.element('input');
-            remove_btn.setAttribute('type', 'button');
-            remove_btn.setAttribute('value', 'Remove video');
-            remove_btn.setAttribute('class', 'remove-videodetector');
-            p.append(remove_btn);
+            this.iframe = iframe;
+            this.block = block;
 
-            editor.insertElement(p);
+            this.setupContent(this.iframe, this.block);
+        },
 
-            // edit_btn.on('click', function(){
-            //     new CKEDITOR.dialog(editor, 'videoDialog');
-            // });
+        onOk: function() {
+            var iframe = this.iframe,
+                block = this.block;
 
-            remove_btn.on('click', function(){
-                var to_remove = remove_btn.getParent();
-                to_remove.remove();
-            });
+            this.commitContent(iframe, block);
+
+            if (this.insertMode) {
+                editor.insertElement(block);
+            }
+
         }
     };
 });
-
-
-//funcion para detectar el id y la plataforma (youtube, vimeo o dailymotion) de los videos
-function detectar(){
-    var getDialog     = document.getElementsByClassName('cke_dialog_contents').item(0);
-    var url           = getDialog.getElementsByTagName('input').item(0).value;
-    var id            = '';
-    var reproductor   = '';
-    var url_comprobar = '';
-
-    if(url.indexOf('youtu.be') >= 0){
-        reproductor = 'youtube';
-        id          = url.substring(url.lastIndexOf("/")+1, url.length);
-    }
-    if(url.indexOf("youtube") >= 0){
-        reproductor = 'youtube'
-        if(url.indexOf("</iframe>") >= 0){
-            var fin = url.substring(url.indexOf("embed/")+6, url.length)
-            id      = fin.substring(fin.indexOf('"'), 0);
-        }else{
-            if(url.indexOf("&") >= 0)
-                id = url.substring(url.indexOf("?v=")+3, url.indexOf("&"));
-            else
-                id = url.substring(url.indexOf("?v=")+3, url.length);
-        }
-        url_comprobar = "https://gdata.youtube.com/feeds/api/videos/" + id + "?v=2&alt=json";
-        //"https://gdata.youtube.com/feeds/api/videos/" + id + "?v=2&alt=json"
-    }
-    if(url.indexOf("vimeo") >= 0){
-        reproductor = 'vimeo'
-        if(url.indexOf("</iframe>") >= 0){
-            var fin = url.substring(url.lastIndexOf('vimeo.com/"')+6, url.indexOf('>'))
-            id      = fin.substring(fin.lastIndexOf('/')+1, fin.indexOf('"',fin.lastIndexOf('/')+1))
-        }else{
-            id = url.substring(url.lastIndexOf("/")+1, url.length)
-        }
-        url_comprobar = 'http://vimeo.com/api/v2/video/' + id + '.json';
-        //'http://vimeo.com/api/v2/video/' + video_id + '.json';
-    }
-    if(url.indexOf('dai.ly') >= 0){
-        reproductor = 'dailymotion';
-        id          = url.substring(url.lastIndexOf("/")+1, url.length);
-    }
-    if(url.indexOf("dailymotion") >= 0){
-        reproductor = 'dailymotion';
-        if(url.indexOf("</iframe>") >= 0){
-            var fin = url.substring(url.indexOf('dailymotion.com/')+16, url.indexOf('></iframe>'))
-            id      = fin.substring(fin.lastIndexOf('/')+1, fin.lastIndexOf('"'))
-        }else{
-            if(url.indexOf('_') >= 0)
-                id = url.substring(url.lastIndexOf('/')+1, url.indexOf('_'))
-            else
-                id = url.substring(url.lastIndexOf('/')+1, url.length);
-        }
-        url_comprobar = 'https://api.dailymotion.com/video/' + id;
-        // https://api.dailymotion.com/video/x26ezrb
-    }
-    return {'reproductor':reproductor,'id_video':id};
-}
