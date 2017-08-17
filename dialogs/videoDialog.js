@@ -30,7 +30,7 @@ CKEDITOR.dialog.add( 'videoDialog', function( editor ) {
 
 
             //detectamos el video
-            var respuesta = detectar();
+            var respuesta = detectar(dialog);
             var url = "";
 
             if(respuesta.reproductor == "youtube"){
@@ -79,9 +79,9 @@ CKEDITOR.dialog.add( 'videoDialog', function( editor ) {
 
 
 //funcion para detectar el id y la plataforma (youtube, vimeo o dailymotion) de los videos
-function detectar(){
-    var getDialog     = document.getElementsByClassName('cke_dialog_contents').item(0);
-    var url           = getDialog.getElementsByTagName('input').item(0).value;
+function detectar(dialog){
+    var getDialog     = dialog.parts.dialog;
+    var url           = getDialog.find('input').getItem(0).getValue();
     var id            = '';
     var reproductor   = '';
     var url_comprobar = '';
